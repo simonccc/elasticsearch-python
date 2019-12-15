@@ -1,8 +1,10 @@
 ## Elasticsearch Tail Command `elasticsearch-tail.py`
 
-Humble implementation of a Unix like tail for Elasticsearch. Tested with Logstash indexed content.
+implementation of a tail like thing for Elasticsearch 7.x
 
-Ported to python3 for Open Distro for Elasticsearch support
+### Setup 
+
+pip3 install -r requirements.txt
 
 ### Usage
 
