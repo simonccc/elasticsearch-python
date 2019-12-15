@@ -3,6 +3,8 @@ import datetime
 import sys
 import ssl
 from elasticsearch.connection import create_ssl_context
+import warnings
+warnings.filterwarnings("ignore")
 import time as time2
 from argparse import ArgumentParser
 import threading
@@ -36,8 +38,7 @@ except:
 # Arguments parsing
 parser = ArgumentParser(description='Unix like tail command for Elastisearch and Logstash.')
 parser.add_argument('-e', '--endpoint', help='ES endpoint URL.', required=True)
-parser.add_argument('-t', '--type', help='Doc_Type: apache, java, tomcat,... ', default='apache')
-parser.add_argument('-i', '--index', help='Index name. If none then "logstash-YYYY.MM.DD" will be used.')
+parser.add_argument('-i', '--index', help='Index name. If none then "filebeat-*" will be used.')
 parser.add_argument('-o', '--hostname', help='Hostname to search (optional).')
 parser.add_argument('-l', '--javalevel', help='Java Level.')
 parser.add_argument('-j', '--javaclass', help='Java Class.')
@@ -106,10 +107,10 @@ def get_latest_event_timestamp(index):
         current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
 
     if host_to_search or value1:
-        res = es.search(size=1, index=index, doc_type=doc_type, fields="@timestamp", sort="@timestamp:desc",
+        res = es.search(size=1, index=index, fields="@timestamp", sort="@timestamp:desc",
                         body=query_latest)
     else:
-        res = es.search(size=1, index=index, doc_type=doc_type, fields="@timestamp", sort="@timestamp:desc",
+        res = es.search(size=1, index=index, fields="@timestamp", sort="@timestamp:desc",
                         body={
                             "query":
                                 {"match_all": {}}
@@ -126,7 +127,7 @@ def get_latest_event_timestamp(index):
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
-        print ("INFO: Please use --index, --type or --hostname")
+        print ("INFO: Please use --index or --hostname")
         sys.exit(1)
 
 
@@ -137,11 +138,11 @@ def get_latest_events(index): # And print them
     # to_print = []
 
     if host_to_search or value1:
-        res = es.search(size=docs, index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
+        res = es.search(size=docs, index=index, fields="@timestamp,message,path,host",
                         sort="@timestamp:desc",
                         body=query_latest)
     else:
-        res = es.search(size=docs, index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
+        res = es.search(size=docs, index=index, fields="@timestamp,message,path,host",
                         sort="@timestamp:desc",
                         body={
                             "query":
@@ -180,7 +181,7 @@ def to_object(res):
 
         # Every new event becomes a new key in the dictionary. Duplicated events (_id) cancel themselves (Only a copy remains)
         # In case an event is retrieved multiple times (same ID) it won't cause duplicates.
-        event_pool[id] = { 'timestamp': timestamp, 'host': host,'type': doc_type, 'message': message }
+        event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
 
     return
 
@@ -212,14 +213,9 @@ def purge_event_pool(event_pool):
     for event in sorted(to_print,key=getKey):
         # print_event_by_event(event)
         if show_headers:
-            print_pool.append(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['id'] + " " + event['host'] + " " + event['type'] + " " + event['message'] + '\n')
-            # print_pool.append(str(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event['type'] + " " + event['message']) + '\n')
+            print_pool.append(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['id'] + " " + event['host'] + " "  + event['message'] + '\n')
         else:
             print_pool.append(event['message'] + '\n')
-            # print_pool.append(str(event['message']) + '\n')
-            # print_pool.append(str(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event['type'] + " " +event['message'])[0:width] + '\n')
-            # print_pool.append(str(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['frontal'] + " " + event['type'] + " " +event['message'])[0:width] + '\n')
-
     return
 
 
@@ -238,8 +234,7 @@ def single_run_purge_event_pool(event_pool):
     for event in sorted(to_print, key=getKey):
         if show_headers:
             print_pool.append(
-                from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event[
-                    'type'] + " " + event['message'] + '\n')
+                from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event['message'] + '\n')
         else:
             print_pool.append(event['message'] + '\n')
 
@@ -271,37 +266,15 @@ def query_test(from_date_time):
     query_search['query']['filtered']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
     # query_search['query']['filtered']['query']['bool']['must'].append({"match": {field1: value1}})
 
-    res = es.search(size=docs, index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
+    res = es.search(size=docs, index=index, fields="@timestamp,message,path,host",
                     sort="@timestamp:asc",
                     body=query_search
                     )
 
     if len(res['hits']['hits']) != 0:
         timestamp = res['hits']['hits'][0]['sort'][0]
-
         to_object(res)
-
         single_run_purge_event_pool(event_pool)
-        # #### Function needed here (and for purge() too)
-        #
-        # for event in event_pool:
-        #     to_print.append(event_pool[event])
-        #
-        # # Sort by timestamp
-        # def getKey(item):
-        #     return item['timestamp']
-        #
-        # for event in sorted(to_print, key=getKey):
-        #     if show_headers:
-        #         print_pool.append(
-        #             from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event[
-        #                 'type'] + " " + event['message'] + '\n')
-        #     else:
-        #         print_pool.append(event['message'] + '\n')
-        #
-        # what_to_do_while_we_wait()
-        # print_pool = []
-        # event_pool = {}
     return
 
 
@@ -354,7 +327,7 @@ def search_events_dummy_load(from_date_time):
         doc_id = 'ES_DUMMY_ID_'+str(timestamp)[-8:]
         # print timestamp,doc_id
         fields = {'path': [path], 'host': [host], 'message': [message_begining + from_epoch_milliseconds_to_string(timestamp) + message_end], '@timestamp': [from_epoch_milliseconds_to_string(timestamp)] }
-        hit = { 'sort': [timestamp], '_type': doc_type, '_index': index, '_score': score, 'fields': fields, '_id': doc_id }
+        hit = { 'sort': [timestamp],  '_index': index, '_score': score, 'fields': fields, '_id': doc_id }
         hits.append(hit)
 
         timestamp += 10
@@ -381,7 +354,7 @@ def search_events(from_date_time):
 
     query_search['query']['filtered']['filter']['range'] = {"@timestamp": {"gte": from_date_time}}
 
-    res = es.search(size="10000", index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
+    res = es.search(size="10000", index=index, fields="@timestamp,message,path,host",
                         sort="@timestamp:asc", body=query_search)
 
 
@@ -508,8 +481,6 @@ if args.endpoint == 'dummy' or args.endpoint == 'DUMMY':
 else:
     DUMMY = False
     endpoint = normalize_endpoint(args.endpoint)
-# --type
-doc_type = args.type
 # --host
 if args.hostname:
     host_to_search = args.hostname
