@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import datetime
 import sys
+import ssl
+from elasticsearch.connection import create_ssl_context
 import time as time2
 from argparse import ArgumentParser
 import threading
@@ -55,11 +57,9 @@ def signal_handler(signal, frame):
     debug('Ctrl+C pressed!')
     sys.exit(0)
 
-
 def debug(message):
     if DEBUG:
         print("DEBUG " + str(message))
-
 
 def normalize_endpoint(endpoint):
     end_with_number = re.compile(":\d+$")
@@ -235,20 +235,6 @@ def to_object(res):
     debug("to_object: out: len(event_pool) "+str(len(event_pool)))
     return
 
-
-# def get_oldest_in_the_pool(): # timestamp
-#     if len(event_pool) != 0:
-#         list = []
-#         for event in event_pool:
-#             #print event_pool[event]['timestamp']
-#             # if event_pool[event]['timestamp'] <= oldest:
-#             #     oldest = event_pool[event]['timestamp']
-#             list.append(event_pool[event]['timestamp'])
-#         oldest = int(sorted(list)[0])
-#         debug("get_oldest_in_the_pool: "+str(oldest)+" "+from_epoch_milliseconds_to_string(int(oldest)))
-#         return oldest
-
-
 def purge_event_pool(event_pool):
     debug("purge_event_pool: in: "+str(len(event_pool)))
     debug("purge_event_pool: ten_seconds_ago "+from_epoch_milliseconds_to_string(ten_seconds_ago))
@@ -270,7 +256,6 @@ def purge_event_pool(event_pool):
         elif event_timestamp < ten_seconds_ago - interval:
             # ...discard what is below last output.
             debug("purge_event_pool: Discarded event @timestamp " + from_epoch_milliseconds_to_string(event_timestamp) + str(event) )
-            # print "WARNING purge_event_pool: Discarded event with @timestamp "+from_epoch_milliseconds_to_string(event_timestamp)+" "+str(event)
             event_pool.pop(event)
 
     # Sort by timestamp
@@ -496,28 +481,12 @@ def what_to_do_while_we_wait():
     print_pool = []
 
 
-# def es_search(from_date_time):
-#     # l.acquire()
-#     # if current_process().name == 'Process-1':
-#     # print "I'am", current_process().name
-#     res = search_events(from_date_time)
-#
-#     debug("from_date_time "+from_date_time)
-#     debug("hits: "+str(len(res['hits']['hits'])))
-#
-#     if len(res['hits']['hits']) == 0:
-#         debug("Empty response!")
-#     else:
-#         # Add all the events in the response into the event_pool
-#         to_object(res)
-
-
 # Get lastest available index
 def check_index():
 
     # Get indices list
     indices = []
-    list = es.indices.get_aliases()
+    list = es.indices.get_alias("*")
     for index in list:
         # We only care for 'logstash-*'
         if index[0:9] == 'logstash-':
@@ -697,7 +666,10 @@ else:
 
 # http://elasticsearch-py.readthedocs.io/en/master/
 if not DUMMY:
-    es = Elasticsearch([endpoint],verify_certs=True, ca_certs=ca_certs)
+    ssl_context = create_ssl_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    es = Elasticsearch([endpoint],verify_certs=False,ssl_context=ssl_context,http_auth=("admin","admin"))
 
 if not DUMMY:
     # --index
@@ -708,12 +680,6 @@ if not DUMMY:
 else:
     # When using DUMMY endpoint index = today
     index = datetime.datetime.utcnow().strftime("logstash-%Y.%m.%d")
-
-# latest_event_timestamp = get_latest_event_timestamp(index)
-# ten_seconds_ago = latest_event_timestamp - to_the_past
-# from_date_time = from_epoch_milliseconds_to_string(ten_seconds_ago)
-# query_test(from_date_time)
-# sys.exit()
 
 # When not under -f just get the latest and exit
 if non_stop == False:
@@ -738,29 +704,6 @@ else:
 
 # Go 10 seconds to the past. There is where we place "in the past" pointer to give time to ES to consolidate its index.
 ten_seconds_ago = latest_event_timestamp - to_the_past
-
-# ###
-# # Initial load
-# from_date_time = from_epoch_milliseconds_to_string(ten_seconds_ago)
-# if DUMMY:
-#     res = search_events_dummy_load(from_date_time)
-# else:
-#     res = search_events(from_date_time)
-#
-# debug("Initial load: from_date_time " + from_date_time)
-# debug("Initial load: hits: " + str(len(res['hits']['hits'])))
-#
-# if len(res['hits']['hits']) == 0:
-#     debug("Initial load: Empty response!")
-# else:
-#     # Add all the events in the response into the event_pool
-#     to_object(res)
-#
-#     # Print and purge oldest events in the pool
-#     purge_event_pool(event_pool)
-#
-# what_to_do_while_we_wait()
-# ###
 
 thread = Threading(1,"Thread-1", ten_seconds_ago)
 
