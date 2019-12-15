@@ -46,7 +46,6 @@ parser.add_argument('-m', '--httpmethod', help='HTTP Request Method.')
 parser.add_argument('-f', '--nonstop', help='Non stop. Continuous tailing.', action="store_true")
 parser.add_argument('-n', '--docs', help='Number of documents.', default=10)
 parser.add_argument('-s', '--showheaders', help='Show @timestamp, hostname and type fields in the output.', action="store_true")
-parser.add_argument('-d', '--debug', help='Debug', action="store_true")
 args = parser.parse_args()
 
 # Dealing with Unicode
@@ -54,12 +53,7 @@ sys.stdout = codecs.getwriter(locale.getpreferredencoding())(sys.stdout)
 
 # Ctrl+C
 def signal_handler(signal, frame):
-    debug('Ctrl+C pressed!')
     sys.exit(0)
-
-def debug(message):
-    if DEBUG:
-        print("DEBUG " + str(message))
 
 def normalize_endpoint(endpoint):
     end_with_number = re.compile(":\d+$")
@@ -104,20 +98,13 @@ def get_latest_event_timestamp_dummy_load(index):
     # # Discard milliseconds and round down to seconds
     # timestamp = (timestamp/1000)*1000
 
-    debug("get_latest_event_timestamp_dummy_load " + from_epoch_milliseconds_to_string(timestamp))
     return timestamp
 
 
 def get_latest_event_timestamp(index):
     if DEBUG:
         current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
-    # if host_to_search:
-    #     res = es.search(size=1, index=index, doc_type=doc_type, fields="@timestamp", sort="@timestamp:desc",
-    #                     body={
-    #                         "query":
-    #                             {"match_phrase": {"host": host_to_search}}
-    #                     }
-    #                     )
+
     if host_to_search or value1:
         res = es.search(size=1, index=index, doc_type=doc_type, fields="@timestamp", sort="@timestamp:desc",
                         body=query_latest)
@@ -129,7 +116,6 @@ def get_latest_event_timestamp(index):
                         }
                         )
 
-    debug("get_latest_event_timestamp "+str(res))
 
     # At least one event should return, otherwise we have an issue.
     # On To-Do: to go a logstash index back trying to find the last event (it might be midnight...)
@@ -137,9 +123,6 @@ def get_latest_event_timestamp(index):
         timestamp = res['hits']['hits'][0]['sort'][0]
         # # Discard milliseconds and round down to seconds
         # timestamp = (timestamp/1000)*1000
-        debug("get_latest_event_timestamp "+str(timestamp)+" "+from_epoch_milliseconds_to_string(timestamp))
-        if DEBUG:
-            debug("ES get_lastest_event execution time: " + str(int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - current_time) + "ms")
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
@@ -153,9 +136,6 @@ def get_latest_events(index): # And print them
     # global print_pool
     # to_print = []
 
-    if DEBUG:
-        current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
-
     if host_to_search or value1:
         res = es.search(size=docs, index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
                         sort="@timestamp:desc",
@@ -169,7 +149,6 @@ def get_latest_events(index): # And print them
                         }
                         )
 
-    debug("get_latest_events: "+str(res))
 
     # At least one event should return, otherwise we have an issue.
     # On To-Do: to go a logstash index back trying to find the last event (it might be midnight...)
@@ -180,33 +159,6 @@ def get_latest_events(index): # And print them
 
         single_run_purge_event_pool(event_pool)
 
-        # #### Function needed here (and for purge() too)
-        #
-        # for event in event_pool:
-        #     to_print.append(event_pool[event])
-        #
-        # # Sort by timestamp
-        # def getKey(item):
-        #     return item['timestamp']
-        #
-        # for event in sorted(to_print, key=getKey):
-        #     if show_headers:
-        #         print_pool.append(
-        #             from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event[
-        #                 'type'] + " " + event['message'] + '\n')
-        #     else:
-        #         print_pool.append(event['message'] + '\n')
-        #
-        # what_to_do_while_we_wait()
-        # print_pool = []
-        # event_pool = {}
-        #
-        # ####
-
-        debug("get_latest_event_timestamp " + str(timestamp) + " " + from_epoch_milliseconds_to_string(timestamp))
-        if DEBUG:
-            debug("ES get_lastest_events execution time: " + str(
-                int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - current_time) + "ms")
         return timestamp # Needed???
     else:
         print ("ERROR: get_latest_events: No results found with the current search criteria under index="+index)
@@ -216,8 +168,6 @@ def get_latest_events(index): # And print them
 
 # Inserts event into event_pool{}
 def to_object(res):
-    debug("to_object: in: len(event_pool) "+str(len(event_pool)))
-    debug("to_object: hits: "+str(len(res['hits']['hits'])))
 
     for hit in res['hits']['hits']:
         if 'host' in hit['fields']:
@@ -232,12 +182,9 @@ def to_object(res):
         # In case an event is retrieved multiple times (same ID) it won't cause duplicates.
         event_pool[id] = { 'timestamp': timestamp, 'host': host,'type': doc_type, 'message': message }
 
-    debug("to_object: out: len(event_pool) "+str(len(event_pool)))
     return
 
 def purge_event_pool(event_pool):
-    debug("purge_event_pool: in: "+str(len(event_pool)))
-    debug("purge_event_pool: ten_seconds_ago "+from_epoch_milliseconds_to_string(ten_seconds_ago))
 
     to_print = []
     for event in event_pool.copy():
@@ -255,7 +202,6 @@ def purge_event_pool(event_pool):
             event_pool.pop(event)
         elif event_timestamp < ten_seconds_ago - interval:
             # ...discard what is below last output.
-            debug("purge_event_pool: Discarded event @timestamp " + from_epoch_milliseconds_to_string(event_timestamp) + str(event) )
             event_pool.pop(event)
 
     # Sort by timestamp
@@ -274,8 +220,6 @@ def purge_event_pool(event_pool):
             # print_pool.append(str(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event['type'] + " " +event['message'])[0:width] + '\n')
             # print_pool.append(str(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['frontal'] + " " + event['type'] + " " +event['message'])[0:width] + '\n')
 
-    debug("purge_event_pool: out: "+str(len(event_pool)))
-    debug("purge_event_pool: len(print_pool) "+str(len(print_pool)))
     return
 
 
@@ -379,7 +323,6 @@ def search_events_dummy_load(from_date_time):
         u'timed_out': False
     }
     """
-    debug("search_events_dummy_load: from_date_time: "+from_date_time)
 
     from_date_time_milliseconds = from_string_to_epoch_milliseconds(from_date_time)
     hits = []
@@ -401,7 +344,6 @@ def search_events_dummy_load(from_date_time):
     total = 1000
 
     # total = randint(0,1000)
-    debug('search_events_dummy_load: total: '+str(total))
 
     timestamp = from_date_time_milliseconds
     ## fields = {'path': [path], 'host': [host], 'message': [message], '@timestamp': [from_epoch_milliseconds_to_string(timestamp)] }
@@ -434,21 +376,14 @@ def search_events_dummy_load(from_date_time):
 
 
 def search_events(from_date_time):
-    if DEBUG:
-        current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
-        debug("search_events: from_date_time: "+from_date_time)
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
     # http://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
-    debug("query: host: "+host_to_search)
 
     query_search['query']['filtered']['filter']['range'] = {"@timestamp": {"gte": from_date_time}}
 
     res = es.search(size="10000", index=index, doc_type=doc_type, fields="@timestamp,message,path,host",
                         sort="@timestamp:asc", body=query_search)
 
-    if DEBUG:
-        debug("ES search execution time: "+str( int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - current_time)+"ms" )
-    return res
 
 
 def wait(milliseconds):
@@ -458,7 +393,8 @@ def wait(milliseconds):
     len_print_pool = len(print_pool)
 
     if len_print_pool == 0:
-        debug("wait: len(print_pool) == 0")
+        print(wibble)
+        exit(0)
 
     while final_time > current_time:
         current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
@@ -488,36 +424,12 @@ def check_index():
     indices = []
     list = es.indices.get_alias("*")
     for index in list:
-        # We only care for 'logstash-*'
-        if index[0:9] == 'logstash-':
+        # TODO make this a config option
+        if index[0:9] == 'filebeat-':
             indices.append(str(index))
-    debug('check_index: found '+str(len(indices))+' indices')
     if indices == []:
-        debug('ERROR check_index: No index found! Exiting.')
         sys.exit(1)
     indices = sorted(indices, reverse=True)
-    # debug('check_index: checking '+index)
-    # days = 1
-    # while True:
-    #     try:
-    #         es.search(size=1, index=index, doc_type=doc_type,
-    #                         body={
-    #                             "query":
-    #                                 {"match_all": {}}
-    #                         }
-    #                         )
-    #         debug('check_index: index '+index+' is valid')
-    #         return index
-    #     except:
-    #         debug('check_index: index '+index+' not found')
-    #         yesterday = datetime.date.today() - datetime.timedelta(days)
-    #         index = yesterday.strftime("logstash-%Y.%m.%d")
-    #         debug('check_index: let\'s try '+str(days)+' days in the past = '+index)
-    #         days += 1
-    #         if days > 31:
-    #             print "ERROR: No index found after trying 30 days in the past"
-    #             sys.exit(1)
-    debug('check_index: returning "'+indices[0]+'"')
     return indices[0]
 
 
@@ -541,9 +453,7 @@ class Threading (threading.Thread):
         self.name = name
         self.from_date_time = from_date_time
     def run(self):
-        debug("Starting " + self.name)
         thread_execution(self.from_date_time)
-        debug("Exiting " + self.name)
         del self
 
 
@@ -551,15 +461,6 @@ class Threading (threading.Thread):
 
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
-
-# --debug
-if args.debug:
-    DEBUG = args.debug
-else:
-    DEBUG = None
-
-debug("main: now " + from_epoch_milliseconds_to_string(datetime.datetime.utcnow().strftime('%s%f')[:-3]))
-debug("main: version 0.9.4")
 
 interval = 1000  # milliseconds
 
@@ -683,7 +584,6 @@ else:
 
 # When not under -f just get the latest and exit
 if non_stop == False:
-    debug('Entering single run...')
     if not DUMMY:
         get_latest_events(index)
     else:
@@ -693,7 +593,6 @@ if non_stop == False:
         to_object(res)
         single_run_purge_event_pool(event_pool)
 
-    debug('Single run finished. Exiting.')
     sys.exit(0)
 
 # Get the latest event timestamp from the Index
