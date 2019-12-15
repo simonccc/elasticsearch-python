@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import datetime
 import sys
 import time as time2
@@ -12,7 +13,7 @@ import codecs, locale # Dealing with Unicode
 try:
     from elasticsearch import Elasticsearch
 except:
-    print "ERROR: elasticsearch module not installed. Please run 'sudo pip install elasticsearch'."
+    print('ERROR: elasticsearch module not installed. Please run sudo pip3 install elasticsearch')
     sys.exit(1)
 
 # To-Do:
@@ -57,7 +58,7 @@ def signal_handler(signal, frame):
 
 def debug(message):
     if DEBUG:
-        print "DEBUG " + str(message)
+        print("DEBUG " + str(message))
 
 
 def normalize_endpoint(endpoint):
@@ -141,8 +142,8 @@ def get_latest_event_timestamp(index):
             debug("ES get_lastest_event execution time: " + str(int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - current_time) + "ms")
         return timestamp
     else:
-        print "ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index
-        print "INFO: Please use --index, --type or --hostname"
+        print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
+        print ("INFO: Please use --index, --type or --hostname")
         sys.exit(1)
 
 
@@ -208,8 +209,8 @@ def get_latest_events(index): # And print them
                 int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - current_time) + "ms")
         return timestamp # Needed???
     else:
-        print "ERROR: get_latest_events: No results found with the current search criteria under index="+index
-        print "INFO: Please use --index, --type or --hostname"
+        print ("ERROR: get_latest_events: No results found with the current search criteria under index="+index)
+        print ("INFO: Please use --index, --type or --hostname")
         sys.exit(1)
 
 
@@ -633,7 +634,7 @@ query_latest = {
 # --endpoint
 if args.endpoint == 'dummy' or args.endpoint == 'DUMMY':
     DUMMY = True
-    print "INFO: Activating Dummy Load"
+    print ("INFO: Activating Dummy Load")
 else:
     DUMMY = False
     endpoint = normalize_endpoint(args.endpoint)
@@ -659,7 +660,7 @@ else:
 # -n --docs
 docs = int(args.docs)
 if docs < 1 or docs > 10000:
-    print "ERROR: Document range has to be between 1 and 10000"
+    print ("ERROR: Document range has to be between 1 and 10000")
     sys.exit(1)
 # --level
 if args.javalevel:
