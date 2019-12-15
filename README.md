@@ -1,8 +1,10 @@
-## Elasticsearch Tail Command `elasticsearch-tail.py`
+## `elasticsearch-tail.py`
 
 implementation of a tail like thing for Elasticsearch 7.x
 
 ### Setup 
+
+Only tested on Python 3
 
 pip3 install -r requirements.txt
 
