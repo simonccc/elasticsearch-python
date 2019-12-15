@@ -64,27 +64,13 @@ def from_string_to_epoch_milliseconds(string):
     return milliseconds
 
 
-def get_latest_event_timestamp_dummy_load(index):
-    # Return current time as fake lastest event in ES
-    timestamp = int(datetime.datetime.utcnow().strftime('%s%f')[:-3]) - 20000
-    return timestamp
-
-
 def get_latest_event_timestamp(index):
-    if host_to_search or value1:
-        res = es.search(size=1, index=index, sort="@timestamp:desc",
-                        body=query_latest)
-    else:
-        res = es.search(size=1, index=index, sort="@timestamp:desc",
-                        body={
-                            "query":
-                                {"match_all": {}}
-                        }
-                        )
+    res = es.search(size=1, index=index, sort="@timestamp:desc", body={"query": {"match_all": {}} })
 
     # At least one event should return, otherwise we have an issue.
     if len(res['hits']['hits']) != 0:
         timestamp = res['hits']['hits'][0]['sort'][0]
+        print('starting from last event: ' + str(timestamp))
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
@@ -92,41 +78,11 @@ def get_latest_event_timestamp(index):
         sys.exit(1)
 
 
-# When we are under -f --nonstop
-def get_latest_events(index): # And print them
-
-    if host_to_search or value1:
-        res = es.search(size=docs, index=index,
-                        sort="@timestamp:desc",
-                        body=query_latest)
-    else:
-        res = es.search(size=docs, index=index,
-                        sort="@timestamp:desc",
-                        body={
-                            "query":
-                                {"match_all": {}}
-                        }
-                        )
-
-    # At least one event should return, otherwise we have an issue.
-    if len(res['hits']['hits']) != 0:
-        timestamp = res['hits']['hits'][0]['sort'][0]
-        to_object(res)
-        single_run_purge_event_pool(event_pool)
-        return timestamp # Needed???
-    else:
-        print ("ERROR: get_latest_events: No results found with the current search criteria under index="+index)
-        print ("INFO: Please use --index, --type or --hostname")
-        sys.exit(1)
-
 
 # Inserts event into event_pool{}
 def to_object(res):
 
-#    print(str(res))
-
     for hit in res['hits']['hits']:
-#        print(str(hit))
         message= str(hit['_source']['message'])
         host = str(hit['_source']['agent']['hostname'])
         id = str(hit['_id'])
@@ -138,6 +94,7 @@ def to_object(res):
 def purge_event_pool(event_pool):
 
     to_print = []
+
     for event in event_pool.copy():
         event_timestamp = int(event_pool[event]['timestamp'])
         # if event_timestamp >= current time pointer and < (current time pointer + the gap covered by interval):
@@ -161,11 +118,8 @@ def purge_event_pool(event_pool):
 
     # Print (add to print_pool) and let wait() function to print it out later
     for event in sorted(to_print,key=getKey):
-        # print_event_by_event(event)
-        if show_headers:
-            print_pool.append(from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['id'] + " " + event['host'] + " "  + event['message'] + '\n')
-        else:
-            print_pool.append(event['message'] + '\n')
+       print_pool.append(event['message'] + '\n')
+
     return
 
 
@@ -189,20 +143,14 @@ def single_run_purge_event_pool(event_pool):
             print_pool.append(event['message'] + '\n')
 
     what_to_do_while_we_wait()
-    # print_pool = []
-    # event_pool = {}
 
 
 def search_events(from_date_time):
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-    # http://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
     query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": from_date_time}}}
-#    print(str(index) + str(query_search))
-    res = es.search(size="1000", index=index, sort="@timestamp:asc", body=query_search)
+    res = es.search(size="10", index=index, sort="@timestamp:asc", body=query_search)
     return res
 
 def wait(milliseconds):
-    # Current time in Epoch milliseconds
     current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
     final_time = current_time + milliseconds
     len_print_pool = len(print_pool)
@@ -210,7 +158,6 @@ def wait(milliseconds):
     while final_time > current_time:
         current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
         what_to_do_while_we_wait()
-        # Sleep just a bit to avoid hammering the CPU (to improve)
         time2.sleep(.01)
 
 def what_to_do_while_we_wait():
@@ -221,8 +168,6 @@ def what_to_do_while_we_wait():
     for i in range(0,len_print_pool_2 ):
         sys.stdout.write( print_pool[i] )
         sys.stdout.flush()
-
-        time2.sleep( (interval / len_print_pool_2 + .0) / wait_interval )
 
     print_pool = []
 
@@ -291,7 +236,7 @@ query_latest = {
   "bool": {
     "must": [
         {
-      "range": {}
+      "filter": {}
      }
     ],
   }
@@ -314,10 +259,7 @@ if args.showheaders:
 else:
     show_headers = False
 # -f --nonstop
-if args.nonstop:
-    non_stop = True
-else:
-    non_stop = False
+non_stop = True
 # -n --docs
 docs = int(args.docs)
 if docs < 1 or docs > 10000:
@@ -336,11 +278,6 @@ if not args.index:
   index = check_index()
 else:
   index = args.index
-
-# When not under -f just get the latest and exit
-if non_stop == False:
-    get_latest_events(index)
-    sys.exit(0)
 
 # Get the latest event timestamp from the Index
 latest_event_timestamp = get_latest_event_timestamp(index)
@@ -367,5 +304,3 @@ while True:
 
     # Move the 'past' pointer one 'interval' ahead
     ten_seconds_ago += interval
-
-    # And here we go again...
