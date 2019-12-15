@@ -19,10 +19,6 @@ parser = ArgumentParser(description='Unix like tail command for Elastisearch')
 parser.add_argument('-e', '--endpoint', help='ES endpoint URL.', required=True)
 parser.add_argument('-i', '--index', help='Index name. If none then "filebeat-*" will be used.')
 parser.add_argument('-o', '--hostname', help='Hostname to search (optional).')
-parser.add_argument('-l', '--javalevel', help='Java Level.')
-parser.add_argument('-j', '--javaclass', help='Java Class.')
-parser.add_argument('-r', '--httpresponse', help='HTTP Server Response.')
-parser.add_argument('-m', '--httpmethod', help='HTTP Request Method.')
 parser.add_argument('-f', '--nonstop', help='Non stop. Continuous tailing.', action="store_true")
 parser.add_argument('-n', '--docs', help='Number of documents.', default=10)
 parser.add_argument('-s', '--showheaders', help='Show @timestamp, hostname fields in the output.', action="store_true")
@@ -76,10 +72,10 @@ def get_latest_event_timestamp_dummy_load(index):
 
 def get_latest_event_timestamp(index):
     if host_to_search or value1:
-        res = es.search(size=1, index=index, fields="@timestamp", sort="@timestamp:desc",
+        res = es.search(size=1, index=index, sort="@timestamp:desc",
                         body=query_latest)
     else:
-        res = es.search(size=1, index=index, fields="@timestamp", sort="@timestamp:desc",
+        res = es.search(size=1, index=index, sort="@timestamp:desc",
                         body={
                             "query":
                                 {"match_all": {}}
@@ -127,7 +123,10 @@ def get_latest_events(index): # And print them
 # Inserts event into event_pool{}
 def to_object(res):
 
+#    print(str(res))
+
     for hit in res['hits']['hits']:
+#        print(str(hit))
         message= str(hit['_source']['message'])
         host = str(hit['_source']['agent']['hostname'])
         id = str(hit['_id'])
@@ -194,48 +193,13 @@ def single_run_purge_event_pool(event_pool):
     # event_pool = {}
 
 
-def query_test(from_date_time):
-    # global event_pool
-    # global print_pool
-    # to_print = []
-
-    query_search = { "query": {
-                            "filtered": {
-                                "query": {
-                                    "bool": {
-                                        "must": [ ]
-                                    }
-                                },
-                                "filter": {
-                                    "range": { }
-                                }
-                            }
-                        }
-                    }
-
-    query_search['query']['filtered']['filter']['range'] = {"@timestamp": {"gte": from_date_time}}
-    query_search['query']['filtered']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
-    # query_search['query']['filtered']['query']['bool']['must'].append({"match": {field1: value1}})
-
-    res = es.search(size=docs, index=index, fields="@timestamp,message,path,host",
-                    sort="@timestamp:asc",
-                    body=query_search
-                    )
-
-    if len(res['hits']['hits']) != 0:
-        timestamp = res['hits']['hits'][0]['sort'][0]
-        to_object(res)
-        single_run_purge_event_pool(event_pool)
-    return
-
 def search_events(from_date_time):
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
     # http://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
-
-    query_search['query']['filtered']['filter']['range'] = {"@timestamp": {"gte": from_date_time}}
-
-    res = es.search(size="10000", index=index, fields="@timestamp,message,path,host",
-                        sort="@timestamp:asc", body=query_search)
+    query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": from_date_time}}}
+#    print(str(index) + str(query_search))
+    res = es.search(size="1000", index=index, sort="@timestamp:asc", body=query_search)
+    return res
 
 def wait(milliseconds):
     # Current time in Epoch milliseconds
@@ -243,16 +207,11 @@ def wait(milliseconds):
     final_time = current_time + milliseconds
     len_print_pool = len(print_pool)
 
-    if len_print_pool == 0:
-        print('wibble... was this debug?')
-        exit(0)
-
     while final_time > current_time:
         current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
         what_to_do_while_we_wait()
         # Sleep just a bit to avoid hammering the CPU (to improve)
         time2.sleep(.01)
-
 
 def what_to_do_while_we_wait():
     global print_pool
@@ -283,17 +242,9 @@ def check_index():
     indices = sorted(indices, reverse=True)
     return indices[0]
 
-
 def thread_execution(from_date_time):
-
-    if DUMMY:
-        res = search_events_dummy_load(from_date_time)
-    else:
-        res = search_events(from_date_time)
-
-    # Add all the events in the response into the event_pool
+    res = search_events(from_date_time)
     to_object(res)
-
     return
 
 
@@ -324,46 +275,37 @@ to_the_past = 10000  # milliseconds
 
 # Mutable query object base for main search
 query_search = {
-    "query": {
-        "filtered": {
-            "query": {
-                "bool": {
-                    "must": []
-                }
-            },
-            "filter": {
-                "range": {}
-            }
-        }
-    }
+"query": {
+  "bool": {
+    "must": [
+    {
+      "range": {}
+     }
+    ],
+  }
+ }
 }
 # and for non continuous search (datetime filter not necessary)
 query_latest = {
-    "query": {
-        "filtered": {
-            "query": {
-                "bool": {
-                    "must": []
-                }
-            }
-        }
-    }
+"query": {
+  "bool": {
+    "must": [
+        {
+      "range": {}
+     }
+    ],
+  }
+ }
 }
-
 
 ### Args
 # --endpoint
-if args.endpoint == 'dummy' or args.endpoint == 'DUMMY':
-    DUMMY = True
-    print ("INFO: Activating Dummy Load")
-else:
-    DUMMY = False
-    endpoint = normalize_endpoint(args.endpoint)
+endpoint = normalize_endpoint(args.endpoint)
 # --host
 if args.hostname:
     host_to_search = args.hostname
-    query_search['query']['filtered']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
-    query_latest['query']['filtered']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
+    query_search['query']['bool']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
+    query_latest['query']['bool']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
 else:
     host_to_search = ''
 # --showheaders. Show @timestamp, hostname and type columns from the output.
@@ -381,26 +323,6 @@ docs = int(args.docs)
 if docs < 1 or docs > 10000:
     print ("ERROR: Document range has to be between 1 and 10000")
     sys.exit(1)
-# --level
-if args.javalevel:
-    value1 = args.javalevel
-    query_search['query']['filtered']['query']['bool']['must'].append({"match": {"level": value1}})
-    query_latest['query']['filtered']['query']['bool']['must'].append({"match": {"level": value1}})
-# --javaclass
-elif args.javaclass:
-    value1 = args.javaclass
-    query_search['query']['filtered']['query']['bool']['must'].append({"match": {"class": value1}})
-    query_latest['query']['filtered']['query']['bool']['must'].append({"match": {"class": value1}})
-# --httpresponse
-elif args.httpresponse:
-    value1 = args.httpresponse
-    query_search['query']['filtered']['query']['bool']['must'].append({"match": {"server_response": value1}})
-    query_latest['query']['filtered']['query']['bool']['must'].append({"match": {"server_response": value1}})
-# --method
-elif args.httpmethod:
-    value1 = args.httpmethod
-    query_search['query']['filtered']['query']['bool']['must'].append({"match": {"method": value1}})
-    query_latest['query']['filtered']['query']['bool']['must'].append({"match": {"method": value1}})
 else:
     value1 = ''
 
