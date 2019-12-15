@@ -19,35 +19,11 @@ Example:
 
 `python elasticsearch-tail.py --endpoint http://elak.example.com -n 50`
 
-By default ES Type = `apache` is used. You can select other types with `--type`.
-
-Examples:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type java`
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type apache`
-
 By default the latest Logstash Index available is used. Optionally you can specify the desired index name.
 
 Example:
 
 `python elasticsearch-tail.py --endpoint http://elak.example.com --index logstash-2016.08.08`
-
-When using `--type java` there are two other selectors available: `--javalevel` and `--javaclass`
-
-Examples:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type java --javalevel ERROR`
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type java --javaclas error.handler.java.class`
-
-When using `--type apache` there are two other selectors available: `--httpresponse` and `--httpmethod`
-
-Examples:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type apache --httpresponse 404`
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --type apache --httpmethod POST`
 
 To have continuous output use `-f` or `--nonstop`.
 
@@ -66,5 +42,3 @@ To display events belonging to a particular host and ignore the rest use `--host
 Example:
 
 `python elasticsearch-tail.py --endpoint http://elak.example.com --hostname server1.example.com`
-
-
