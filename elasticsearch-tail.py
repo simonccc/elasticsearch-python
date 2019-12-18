@@ -210,14 +210,14 @@ class Threading (threading.Thread):
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
 
-interval = 1000  # milliseconds
+interval = 100  # milliseconds
 
 ## { "_id": {"timestamp":"sort(in milliseconds)", "host":"", "type":"", "message":"") }
 event_pool = {}
 
 print_pool = []
 
-to_the_past = 10000  # milliseconds
+to_the_past = 5000  # milliseconds
 
 # Mutable query object base for main search
 query_search = {
