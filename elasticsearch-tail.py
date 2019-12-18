@@ -13,11 +13,11 @@ import platform
 import re
 import signal # Dealing with Ctrl+C
 from elasticsearch import Elasticsearch
+import config as cfg
 
 # Arguments parsing
 parser = ArgumentParser(description='Unix like tail command for Elastisearch')
 parser.add_argument('-e', '--endpoint', help='ES endpoint URL.', required=True)
-parser.add_argument('-i', '--index', help='Index name. If none then "filebeat-*" will be used.')
 parser.add_argument('-o', '--hostname', help='Hostname to search (optional).')
 parser.add_argument('-f', '--nonstop', help='Non stop. Continuous tailing.', action="store_true")
 parser.add_argument('-n', '--docs', help='Number of documents.', default=10)
@@ -180,7 +180,8 @@ def check_index():
     list = es.indices.get_alias("*")
     for index in list:
         # TODO make this a config option
-        if index[0:9] == 'filebeat-':
+#        if index[0:9] == 'filebeat-':
+        if index[0:9] == cfg.myindex['name']:
             indices.append(str(index))
     if indices == []:
         sys.exit(1)
@@ -274,10 +275,7 @@ ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 es = Elasticsearch([endpoint],verify_certs=False,ssl_context=ssl_context,http_auth=("admin","admin"))
 
-if not args.index:
-  index = check_index()
-else:
-  index = args.index
+index = check_index()
 
 # Get the latest event timestamp from the Index
 latest_event_timestamp = get_latest_event_timestamp(index)
