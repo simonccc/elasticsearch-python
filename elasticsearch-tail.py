@@ -16,12 +16,8 @@ from elasticsearch import Elasticsearch
 import config as cfg
 
 # Arguments parsing
-parser = ArgumentParser(description='Unix like tail command for Elastisearch')
+parser = ArgumentParser(description='tail command for ES')
 parser.add_argument('-e', '--endpoint', help='ES endpoint URL.', required=True)
-parser.add_argument('-o', '--hostname', help='Hostname to search (optional).')
-parser.add_argument('-f', '--nonstop', help='Non stop. Continuous tailing.', action="store_true")
-parser.add_argument('-n', '--docs', help='Number of documents.', default=10)
-parser.add_argument('-s', '--showheaders', help='Show @timestamp, hostname fields in the output.', action="store_true")
 args = parser.parse_args()
 
 # Ctrl+C
@@ -48,14 +44,12 @@ def normalize_endpoint(endpoint):
 
     return endpoint
 
-
 def from_epoch_milliseconds_to_string(epoch_milli):
     return str(datetime.datetime.utcfromtimestamp( float(str( epoch_milli )[:-3]+'.'+str( epoch_milli )[-3:]) ).strftime('%Y-%m-%dT%H:%M:%S.%f'))[:-3]+"Z"
 
 
 def from_epoch_seconds_to_string(epoch_secs):
     return from_epoch_milliseconds_to_string(epoch_secs * 1000)
-
 
 def from_string_to_epoch_milliseconds(string):
     epoch = datetime.datetime(1970, 1, 1)
@@ -74,10 +68,7 @@ def get_latest_event_timestamp(index):
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
-        print ("INFO: Please use --index or --hostname")
         sys.exit(1)
-
-
 
 # Inserts event into event_pool{}
 def to_object(res):
@@ -88,7 +79,6 @@ def to_object(res):
         id = str(hit['_id'])
         timestamp = str(hit['sort'][0])
         event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
-
     return
 
 def purge_event_pool(event_pool):
@@ -119,9 +109,7 @@ def purge_event_pool(event_pool):
     # Print (add to print_pool) and let wait() function to print it out later
     for event in sorted(to_print,key=getKey):
        print_pool.append(event['message'] + '\n')
-
     return
-
 
 def single_run_purge_event_pool(event_pool):
     # global event_pool
@@ -135,19 +123,14 @@ def single_run_purge_event_pool(event_pool):
     def getKey(item):
         return item['timestamp']
 
-    for event in sorted(to_print, key=getKey):
-        if show_headers:
-            print_pool.append(
-                from_epoch_milliseconds_to_string(event['timestamp']) + " " + event['host'] + " " + event['message'] + '\n')
-        else:
-            print_pool.append(event['message'] + '\n')
+    for event in set(sorted(to_print, key=getKey)):
+        print_pool.append(event['message'] + '\n')
 
     what_to_do_while_we_wait()
 
-
 def search_events(from_date_time):
     query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": from_date_time}}}
-    res = es.search(size="10", index=index, sort="@timestamp:asc", body=query_search)
+    res = es.search(size="100", index=index, sort="@timestamp:asc", body=query_search)
     return res
 
 def wait(milliseconds):
@@ -179,8 +162,6 @@ def check_index():
     indices = []
     list = es.indices.get_alias("*")
     for index in list:
-        # TODO make this a config option
-#        if index[0:9] == 'filebeat-':
         if index[0:9] == cfg.myindex['name']:
             indices.append(str(index))
     if indices == []:
@@ -193,7 +174,6 @@ def thread_execution(from_date_time):
     to_object(res)
     return
 
-
 class Threading (threading.Thread):
     def __init__(self, threadID, name, from_date_time):
         threading.Thread.__init__(self)
@@ -204,20 +184,18 @@ class Threading (threading.Thread):
         thread_execution(self.from_date_time)
         del self
 
-
 ### Main
 
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
 
-interval = 100  # milliseconds
+interval = 1000  # milliseconds
 
-## { "_id": {"timestamp":"sort(in milliseconds)", "host":"", "type":"", "message":"") }
 event_pool = {}
 
 print_pool = []
 
-to_the_past = 5000  # milliseconds
+to_the_past = 10000  # milliseconds
 
 # Mutable query object base for main search
 query_search = {
@@ -247,34 +225,18 @@ query_latest = {
 ### Args
 # --endpoint
 endpoint = normalize_endpoint(args.endpoint)
-# --host
-if args.hostname:
-    host_to_search = args.hostname
-    query_search['query']['bool']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
-    query_latest['query']['bool']['query']['bool']['must'].append({"match_phrase": {"host": host_to_search}})
-else:
-    host_to_search = ''
-# --showheaders. Show @timestamp, hostname and type columns from the output.
-if args.showheaders:
-    show_headers = True
-else:
-    show_headers = False
-# -f --nonstop
-non_stop = True
-# -n --docs
-docs = int(args.docs)
-if docs < 1 or docs > 10000:
-    print ("ERROR: Document range has to be between 1 and 10000")
-    sys.exit(1)
-else:
-    value1 = ''
 
 # http://elasticsearch-py.readthedocs.io/en/master/
 ssl_context = create_ssl_context()
+
+# disable these if you don't need them!
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
+
+# and fix this
 es = Elasticsearch([endpoint],verify_certs=False,ssl_context=ssl_context,http_auth=("admin","admin"))
 
+# get index
 index = check_index()
 
 # Get the latest event timestamp from the Index
