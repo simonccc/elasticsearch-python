@@ -6,47 +6,20 @@ from elasticsearch.connection import create_ssl_context
 import warnings
 warnings.filterwarnings("ignore")
 import time as time2
-from argparse import ArgumentParser
 import threading
 # from random import randint
 import platform
 import re
-import signal # Dealing with Ctrl+C
+import signal 
 from elasticsearch import Elasticsearch
 import config as cfg
-
-# Arguments parsing
-parser = ArgumentParser(description='tail command for ES')
-parser.add_argument('-e', '--endpoint', help='ES endpoint URL.', required=True)
-args = parser.parse_args()
 
 # Ctrl+C
 def signal_handler(signal, frame):
     sys.exit(0)
 
-def normalize_endpoint(endpoint):
-    end_with_number = re.compile(":\d+$")
-
-    if endpoint[-1:] == '/':
-        endpoint = endpoint[:-1]
-
-    if endpoint[0:5] == "http:" and not end_with_number.search(endpoint):
-        endpoint = endpoint+":80"
-        return endpoint
-
-    if endpoint[0:6] == "https:" and not end_with_number.search(endpoint):
-        endpoint = endpoint+":443"
-        return endpoint
-
-    if not end_with_number.search(endpoint):
-        endpoint = endpoint+":80"
-        return endpoint
-
-    return endpoint
-
 def from_epoch_milliseconds_to_string(epoch_milli):
     return str(datetime.datetime.utcfromtimestamp( float(str( epoch_milli )[:-3]+'.'+str( epoch_milli )[-3:]) ).strftime('%Y-%m-%dT%H:%M:%S.%f'))[:-3]+"Z"
-
 
 def from_epoch_seconds_to_string(epoch_secs):
     return from_epoch_milliseconds_to_string(epoch_secs * 1000)
@@ -56,7 +29,6 @@ def from_string_to_epoch_milliseconds(string):
     pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
     milliseconds =  int(str(int((datetime.datetime.strptime(from_date_time, pattern) - epoch).total_seconds()))+from_date_time[-4:-1])
     return milliseconds
-
 
 def get_latest_event_timestamp(index):
     res = es.search(size=1, index=index, sort="@timestamp:desc", body={"query": {"match_all": {}} })
@@ -165,6 +137,7 @@ def check_index():
         if index[0:9] == cfg.myindex['name']:
             indices.append(str(index))
     if indices == []:
+        print('no index ' + str(cfg.myindex['name']))
         sys.exit(1)
     indices = sorted(indices, reverse=True)
     return indices[0]
@@ -209,22 +182,6 @@ query_search = {
   }
  }
 }
-# and for non continuous search (datetime filter not necessary)
-query_latest = {
-"query": {
-  "bool": {
-    "must": [
-        {
-      "filter": {}
-     }
-    ],
-  }
- }
-}
-
-### Args
-# --endpoint
-endpoint = normalize_endpoint(args.endpoint)
 
 # http://elasticsearch-py.readthedocs.io/en/master/
 ssl_context = create_ssl_context()
@@ -234,7 +191,7 @@ ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
 # and fix this
-es = Elasticsearch([endpoint],verify_certs=False,ssl_context=ssl_context,http_auth=("admin","admin"))
+es = Elasticsearch(cfg.elastic['es_host'],verify_certs=False,ssl_context=ssl_context,http_auth=(cfg.elastic['user'],cfg.elastic['pass']))
 
 # get index
 index = check_index()
@@ -244,7 +201,6 @@ latest_event_timestamp = get_latest_event_timestamp(index)
 
 # Go 10 seconds to the past. There is where we place "in the past" pointer to give time to ES to consolidate its index.
 ten_seconds_ago = latest_event_timestamp - to_the_past
-
 thread = Threading(1,"Thread-1", ten_seconds_ago)
 
 while True:

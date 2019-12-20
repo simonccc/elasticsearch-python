@@ -1,46 +1,24 @@
 ## `elasticsearch-tail.py`
 
-implementation of a tail like thing for Elasticsearch 7.x
+implementation of a tail like thing for elasticsearch 7.x
 
-### Setup 
+simplification of the earlier work by juan-domenech - thanks!! :) 
 
-Only tested on Python 3
+tested against the open distro for elasticsearch 1.2.x
+
+### Security
+
+all of the TLS verification checks have been removed
+
+### Setup
+
+python 3 required
 
 pip3 install -r requirements.txt
 
 ### Usage
 
-The only mandatory parameter is `--endpoint`.
+create a config.py based on the example provided
 
-Example:
-`python elasticsearch-tail.py --endpoint http://elak.example.com`
+then run ./elasticsearch-tail.py
 
-By default last 10 lines of log are displayed. You can change this behaviour with `--docs` or `-n` switch.
-
-Example:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com -n 50`
-
-By default the latest Logstash Index available is used. Optionally you can specify the desired index name.
-
-Example:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --index logstash-2016.08.08`
-
-To have continuous output use `-f` or `--nonstop`.
-
-Example:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com -f`
-
-To display the native ES timestamp of each event use `--showheaders`.
-
-Example:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --showheaders`
-
-To display events belonging to a particular host and ignore the rest use `--hostname`.
-
-Example:
-
-`python elasticsearch-tail.py --endpoint http://elak.example.com --hostname server1.example.com`
