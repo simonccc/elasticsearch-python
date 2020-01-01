@@ -4,7 +4,7 @@ implementation of a tail like thing for elasticsearch 7.x
 
 simplification of the earlier work by juan-domenech - thanks!! :) 
 
-tested against the open distro for elasticsearch 1.2.x
+tested against the open distro for elasticsearch 1.3.x
 
 ### Security
 
@@ -19,6 +19,8 @@ pip3 install -r requirements.txt
 ### Usage
 
 create a config.py based on the example provided
+
+logstash and filebeat are the only index patterns tested so far! ymmv
 
 then run ./elasticsearch-tail.py
 
