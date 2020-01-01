@@ -8,7 +8,7 @@ tested against the open distro for elasticsearch 1.3.x
 
 ### Security
 
-all of the TLS verification checks have been removed
+all of the TLS verification checks have been removed - have a look at the code; they should be easy to re-enable
 
 ### Setup
 
@@ -21,6 +21,7 @@ pip3 install -r requirements.txt
 create a config.py based on the example provided
 
 logstash and filebeat are the only index patterns tested so far! ymmv
+you do not need to include a trailing '-' on the index
 
 then run ./elasticsearch-tail.py
 
