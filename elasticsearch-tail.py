@@ -10,7 +10,7 @@ import threading
 # from random import randint
 import platform
 import re
-import signal 
+import signal
 from elasticsearch import Elasticsearch
 import config as cfg
 
@@ -82,23 +82,6 @@ def purge_event_pool(event_pool):
     for event in sorted(to_print,key=getKey):
        print_pool.append(event['message'] + '\n')
     return
-
-def single_run_purge_event_pool(event_pool):
-    # global event_pool
-    global print_pool
-    to_print = []
-
-    for event in event_pool:
-        to_print.append(event_pool[event])
-
-    # Sort by timestamp
-    def getKey(item):
-        return item['timestamp']
-
-    for event in set(sorted(to_print, key=getKey)):
-        print_pool.append(event['message'] + '\n')
-
-    what_to_do_while_we_wait()
 
 def search_events(from_date_time):
     query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": from_date_time}}}
