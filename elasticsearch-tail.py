@@ -47,9 +47,17 @@ def to_object(res):
 
     for hit in res['hits']['hits']:
         message= str(hit['_source']['message'])
-        host = str(hit['_source']['agent']['hostname'])
+
+        # filebeat
+        if re.search('filebeat', cfg.myindex['name']):
+            host = str(hit['_source']['agent']['hostname'])
+        else:
+        # assume logstash format as default
+            host = str(hit['_source']['logsource'])
+
         id = str(hit['_id'])
         timestamp = str(hit['sort'][0])
+
         event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
     return
 
@@ -80,7 +88,13 @@ def purge_event_pool(event_pool):
 
     # Print (add to print_pool) and let wait() function to print it out later
     for event in sorted(to_print,key=getKey):
-       print_pool.append(event['message'] + '\n')
+       # my current filebeat logs include date + hostname
+       if re.search('filebeat', cfg.myindex['name']):
+         print_pool.append(event['message'] + '\n')
+       # logstash / default include data and logsource
+       else:
+         dt = datetime.datetime.fromtimestamp(int(event['timestamp']) / 1000).isoformat()
+         print_pool.append(dt + " " + event['host'] + " " + event['message'] + '\n')
     return
 
 def search_events(from_date_time):
@@ -117,7 +131,7 @@ def check_index():
     indices = []
     list = es.indices.get_alias("*")
     for index in list:
-        if index[0:9] == cfg.myindex['name']:
+        if index[0:9] == str(cfg.myindex['name'] + '-'):
             indices.append(str(index))
     if indices == []:
         print('no index ' + str(cfg.myindex['name']))
