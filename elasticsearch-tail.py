@@ -39,7 +39,7 @@ def get_latest_event_timestamp(index):
         print('starting from last event: ' + str(timestamp))
         return timestamp
     else:
-        print ("ERROR: get_latest_event_timestamp: No results found with the current search criteria under index="+index)
+        print ("ERROR: get_latest_event_timestamp: No results found in index="+index)
         sys.exit(1)
 
 # Inserts event into event_pool{}
@@ -47,18 +47,18 @@ def to_object(res):
 
     for hit in res['hits']['hits']:
         message= str(hit['_source']['message'])
+        id = str(hit['_id'])
+        timestamp = str(hit['sort'][0])
 
         # filebeat
         if re.search('filebeat', cfg.myindex['name']):
             host = str(hit['_source']['agent']['hostname'])
+            event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
         else:
         # assume logstash format as default
             host = str(hit['_source']['logsource'])
-
-        id = str(hit['_id'])
-        timestamp = str(hit['sort'][0])
-
-        event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
+            prog = str(hit['_source']['program'])
+            event_pool[id] = { 'timestamp': timestamp, 'host': host, 'prog': prog,'message': message }
     return
 
 def purge_event_pool(event_pool):
@@ -88,13 +88,15 @@ def purge_event_pool(event_pool):
 
     # Print (add to print_pool) and let wait() function to print it out later
     for event in sorted(to_print,key=getKey):
+
        # my current filebeat logs include date + hostname
        if re.search('filebeat', cfg.myindex['name']):
          print_pool.append(event['message'] + '\n')
        # logstash / default include data and logsource
        else:
          dt = datetime.datetime.fromtimestamp(int(event['timestamp']) / 1000).isoformat()
-         print_pool.append(dt + " " + event['host'] + " " + event['message'] + '\n')
+         print_pool.append('\x1b[1;33;94m' + dt + '\x1b[0m-' + '\x1b[1;33;33m' + event['host'] + '\x1b[0m-' + '\x1b[1;33;92m' + event['prog'] + '\x1b[0m '  + event['message'] + '\n')
+
     return
 
 def search_events(from_date_time):
