@@ -36,6 +36,8 @@ def get_latest_event_timestamp(index):
     # At least one event should return, otherwise we have an issue.
     if len(res['hits']['hits']) != 0:
         timestamp = res['hits']['hits'][0]['sort'][0]
+        dt = datetime.datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        print('from: \x1b[1;33;94m' + str(dt) + '\x1b[0m')
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found in index="+index)
@@ -43,24 +45,23 @@ def get_latest_event_timestamp(index):
 
 # Inserts event into event_pool{}
 def to_object(res):
+  for hit in res['hits']['hits']:
+    message= str(hit['_source']['message'])
+    id = str(hit['_id'])
+    timestamp = str(hit['sort'][0])
+    prog = 'NONE'
 
-    for hit in res['hits']['hits']:
-        message= str(hit['_source']['message'])
-        id = str(hit['_id'])
-        timestamp = str(hit['sort'][0])
+    # filebeat
+    if re.search('filebeat', cfg.myindex['name']):
+      host = str(hit['_source']['agent']['hostname'])
+      event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
+    else:
+      # assume logstash format as default
+      host = str(hit['_source']['logsource'])
+      if (hit['_source']['program']) is not None:
+        prog = str(hit['_source']['program'])
 
-        # filebeat
-        if re.search('filebeat', cfg.myindex['name']):
-            host = str(hit['_source']['agent']['hostname'])
-            event_pool[id] = { 'timestamp': timestamp, 'host': host, 'message': message }
-        else:
-        # assume logstash format as default
-            host = str(hit['_source']['logsource'])
-            if (hit['_source']['program']) is not None:
-              prog = str(hit['_source']['program'])
-            else:
-                prog = 'NONE'
-            event_pool[id] = { 'timestamp': timestamp, 'host': host, 'prog': prog,'message': message }
+      event_pool[id] = { 'timestamp': timestamp, 'host': host, 'prog': prog,'message': message }
     return
 
 def purge_event_pool(event_pool):
@@ -96,8 +97,9 @@ def purge_event_pool(event_pool):
          print_pool.append(event['message'] + '\n')
        # logstash / default include data and logsource
        else:
-         dt = datetime.datetime.fromtimestamp(int(event['timestamp']) / 1000).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-         print_pool.append('\x1b[1;33;94m' + dt + '\x1b[0m ' + '\x1b[1;33;33m' + event['host'] + '\x1b[0m ' + '\x1b[1;33;92m' + event['prog'] + '\x1b[0m '  + event['message'] + '\n')
+         dt = datetime.datetime.fromtimestamp(int(event['timestamp']) / 1000).strftime('%H:%M:%S.%f')[:-3]
+         # fix this 
+         print_pool.append('\x1b[1;33;94m' + dt + '\x1b[0m:' + '\x1b[1;33;33m' + event['host'] + '\x1b[0m:' + '\x1b[1;33;92m' + event['prog'] + '\x1b[0m:'  + event['message'] + '\n')
 
     return
 
@@ -131,16 +133,16 @@ def what_to_do_while_we_wait():
 # Get lastest available index
 def check_index():
 
-    # Get indices list
     indices = []
     list = es.indices.get_alias("*")
     for index in list:
-        if index[0:9] == str(cfg.myindex['name'] + '-'):
-            indices.append(str(index))
+        if re.search(str(cfg.myindex['name']), index):
+          indices.append(str(index))
     if indices == []:
         print('no index ' + str(cfg.myindex['name']))
         sys.exit(1)
     indices = sorted(indices, reverse=True)
+    print('Tailing \x1b[1;33;91m' + indices[0] + '\x1b[0m ', end = '')
     return indices[0]
 
 def thread_execution(from_date_time):
@@ -163,13 +165,13 @@ class Threading (threading.Thread):
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
 
-interval = 100  # milliseconds
+interval = 1000  # milliseconds
 
 event_pool = {}
 
 print_pool = []
 
-to_the_past = 1000  # milliseconds
+to_the_past = 10000  # milliseconds
 
 # Mutable query object base for main search
 query_search = {
