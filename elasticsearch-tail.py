@@ -24,20 +24,12 @@ def from_epoch_milliseconds_to_string(epoch_milli):
 def from_epoch_seconds_to_string(epoch_secs):
     return from_epoch_milliseconds_to_string(epoch_secs * 1000)
 
-def from_string_to_epoch_milliseconds(string):
-    epoch = datetime.datetime(1970, 1, 1)
-    pattern = '%Y-%m-%dT%H:%M:%S.%fZ'
-    milliseconds =  int(str(int((datetime.datetime.strptime(from_date_time, pattern) - epoch).total_seconds()))+from_date_time[-4:-1])
-    return milliseconds
-
 def get_latest_event_timestamp(index):
     res = es.search(size=1, index=index, sort="@timestamp:desc", body={"query": {"match_all": {}} })
 
     # At least one event should return, otherwise we have an issue.
     if len(res['hits']['hits']) != 0:
         timestamp = res['hits']['hits'][0]['sort'][0]
-        dt = datetime.datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-#        print('from: \x1b[1;33;94m' + str(dt) + '\x1b[0m')
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found in index="+index)
@@ -65,9 +57,13 @@ def to_object(res):
     return
 
 def search_events(then,now):
-    query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": then, "lte": now}}}
+    query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gt": then, "lte": now}}}
     res = es.search(size="1000", index=index, sort="@timestamp:asc", body=query_search)
     return res
+
+def timestamp_short(timestamp):
+    short = datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3]
+    return short
 
 # Get lastest available index
 def check_index():
@@ -115,6 +111,8 @@ index = check_index()
 
 # Get the latest event timestamp from the Index
 latest_event_timestamp = get_latest_event_timestamp(index)
+
+# get current timestamp
 current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
 
 while True:
@@ -132,9 +130,14 @@ while True:
     for key in results['hits']['hits']:
 
       message= str(key['_source']['message'])
-      id = str(key['_id'])
-      timestamp = str(key['sort'][0])
-      dt = datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3]
+#      id = str(key['_id'])
+
+      # timestamp from the last message in the result set is used for the next query
+      timestamp = int(key['sort'][0])
+
+      # convert timestamp into short time format used in output 
+      time = timestamp_short(timestamp)
+
       prog = 'NONE'
 
       # filebeat
@@ -146,9 +149,9 @@ while True:
         if (key['_source']['program']) is not None:
           prog = str(key['_source']['program'])
 
-      print('\x1b[1;33;94m' + dt + '\x1b[0m ' + '\x1b[1;33;33m' + host +'\x1b[0m ' + '\x1b[1;33;92m' + prog + '\x1b[0m '  + message)
+      print('\x1b[1;33;94m' + time + '\x1b[0m ' + '\x1b[1;33;33m' + host +'\x1b[0m ' + '\x1b[1;33;92m' + prog + '\x1b[0m '  + message)
 
     # end of results so set "current" timestamp to the last result
     current_time = timestamp
 
-  time2.sleep(0.5)
+  time2.sleep(0.2)
