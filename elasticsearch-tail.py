@@ -37,7 +37,7 @@ def get_latest_event_timestamp(index):
     if len(res['hits']['hits']) != 0:
         timestamp = res['hits']['hits'][0]['sort'][0]
         dt = datetime.datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        print('from: \x1b[1;33;94m' + str(dt) + '\x1b[0m')
+#        print('from: \x1b[1;33;94m' + str(dt) + '\x1b[0m')
         return timestamp
     else:
         print ("ERROR: get_latest_event_timestamp: No results found in index="+index)
@@ -64,71 +64,10 @@ def to_object(res):
       event_pool[id] = { 'timestamp': timestamp, 'host': host, 'prog': prog,'message': message }
     return
 
-def purge_event_pool(event_pool):
-
-    to_print = []
-
-    for event in event_pool.copy():
-        event_timestamp = int(event_pool[event]['timestamp'])
-        # if event_timestamp >= current time pointer and < (current time pointer + the gap covered by interval):
-        # if event_timestamp >= ten_seconds_ago and (event_timestamp < ten_seconds_ago + interval):
-        # if event_timestamp <= oldest_in_the_pool + interval:
-        if event_timestamp >= (ten_seconds_ago - interval) and event_timestamp < ten_seconds_ago:
-            # Print and...
-            event_to_print = event_pool[event]
-            # adding event ID
-            event_to_print['id'] = event
-            to_print.append(event_pool[event])
-            # delete...
-            event_pool.pop(event)
-        elif event_timestamp < ten_seconds_ago - interval:
-            # ...discard what is below last output.
-            event_pool.pop(event)
-
-    # Sort by timestamp
-    def getKey(item):
-        return item['timestamp']
-
-    # Print (add to print_pool) and let wait() function to print it out later
-    for event in sorted(to_print,key=getKey):
-
-       # my current filebeat logs include date + hostname
-       if re.search('filebeat', cfg.myindex['name']):
-         print_pool.append(event['message'] + '\n')
-       # logstash / default include data and logsource
-       else:
-         dt = datetime.datetime.fromtimestamp(int(event['timestamp']) / 1000).strftime('%H:%M:%S.%f')[:-3]
-         # fix this 
-         print_pool.append('\x1b[1;33;94m' + dt + '\x1b[0m:' + '\x1b[1;33;33m' + event['host'] + '\x1b[0m:' + '\x1b[1;33;92m' + event['prog'] + '\x1b[0m:'  + event['message'] + '\n')
-
-    return
-
-def search_events(from_date_time):
-    query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": from_date_time}}}
+def search_events(then,now):
+    query_search['query']['bool']['must'] = {"range": {"@timestamp": {"gte": then, "lte": now}}}
     res = es.search(size="1000", index=index, sort="@timestamp:asc", body=query_search)
     return res
-
-def wait(milliseconds):
-    current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
-    final_time = current_time + milliseconds
-    len_print_pool = len(print_pool)
-
-    while final_time > current_time:
-        current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
-        what_to_do_while_we_wait()
-        time2.sleep(.01)
-
-def what_to_do_while_we_wait():
-    global print_pool
-    len_print_pool_2 = len( print_pool )
-    wait_interval = interval + .0
-
-    for i in range(0,len_print_pool_2 ):
-        sys.stdout.write( print_pool[i] )
-        sys.stdout.flush()
-
-    print_pool = []
-
 
 # Get lastest available index
 def check_index():
@@ -142,38 +81,13 @@ def check_index():
         print('no index ' + str(cfg.myindex['name']))
         sys.exit(1)
     indices = sorted(indices, reverse=True)
-    print('Tailing \x1b[1;33;91m' + indices[0] + '\x1b[0m ', end = '')
+    print('Tailing \x1b[1;33;91m' + indices[0] + '\x1b[0m')
     return indices[0]
-
-def thread_execution(from_date_time):
-    res = search_events(from_date_time)
-    to_object(res)
-    return
-
-class Threading (threading.Thread):
-    def __init__(self, threadID, name, from_date_time):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.from_date_time = from_date_time
-    def run(self):
-        thread_execution(self.from_date_time)
-        del self
-
-### Main
 
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
 
-interval = 1000  # milliseconds
-
-event_pool = {}
-
-print_pool = []
-
-to_the_past = 10000  # milliseconds
-
-# Mutable query object base for main search
+#query object base for main search
 query_search = {
 "query": {
   "bool": {
@@ -201,25 +115,40 @@ index = check_index()
 
 # Get the latest event timestamp from the Index
 latest_event_timestamp = get_latest_event_timestamp(index)
-
-# Go 10 seconds to the past. There is where we place "in the past" pointer to give time to ES to consolidate its index.
-ten_seconds_ago = latest_event_timestamp - to_the_past
-thread = Threading(1,"Thread-1", ten_seconds_ago)
+current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
 
 while True:
 
-    # From timestamp in milliseconds to Elasticsearch format (seconds.milliseconds). i.e: 2016-07-14T13:37:45.123Z
-    from_date_time = from_epoch_milliseconds_to_string(ten_seconds_ago)
+  # get latest ES timestamp
+  latest_event_timestamp = get_latest_event_timestamp(index)
 
-    if not thread.isAlive():
-        thread = Threading(1,"Thread-1", from_date_time)
-        thread.start()
+  # if latest ES timestamp is > now
+  if ( int(latest_event_timestamp) > int(current_time)):
 
-    # "Send to print" and purge oldest events in the pool
-    purge_event_pool(event_pool)
+    # query ES for events between current time and latest
+    results = search_events(int(current_time), int(latest_event_timestamp))
 
-    # Wait for Elasticsearch to index a bit more of stuff and Print meanwhile
-    wait(interval)
+    # map dict of results
+    for key in results['hits']['hits']:
 
-    # Move the 'past' pointer one 'interval' ahead
-    ten_seconds_ago += interval
+      message= str(key['_source']['message'])
+      id = str(key['_id'])
+      timestamp = str(key['sort'][0])
+      dt = datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3]
+      prog = 'NONE'
+
+      # filebeat
+      if re.search('filebeat', cfg.myindex['name']):
+        host = str(key['_source']['agent']['hostname'])
+      else:
+      # assume logstash format as default
+        host = str(key['_source']['logsource'])
+        if (key['_source']['program']) is not None:
+          prog = str(key['_source']['program'])
+
+      print('\x1b[1;33;94m' + dt + '\x1b[0m ' + '\x1b[1;33;33m' + host +'\x1b[0m ' + '\x1b[1;33;92m' + prog + '\x1b[0m '  + message)
+
+    # end of results so set "current" timestamp to the last result
+    current_time = timestamp
+
+  time2.sleep(0.5)
