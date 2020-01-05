@@ -5,7 +5,8 @@ elastic = {'es_host': 'https://localhost:9200',
 myindex = {'name': 'logstash'}
 #  how long to sleep between requests in seconds
 tail = {
-        'sleep': 0.2
+        'sleep': 0.5
+        'result_size': 1000
 }
 tail_colors = {
         'enabled': 'true',

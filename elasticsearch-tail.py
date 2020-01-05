@@ -31,7 +31,7 @@ def get_latest_ts(index):
 
 def search_events(then,now):
   query = {'query': {'bool': {'must': {'range': {'@timestamp': {'gt': then, 'lte': now }}}}}}
-  res = es.search(size="1000", index=index, sort="@timestamp:asc", body=query)
+  res = es.search(size=cfg.tail['result_size'], index=index, sort="@timestamp:asc", body=query)
   return res
 
 def timestamp_short(timestamp):
@@ -115,14 +115,31 @@ while True:
 
       # timestamp from the last message in the result set is used for the next query
       # time is the shorter format used in output
-      timestamp = int(key['sort'][0])
+      # sometimes its not in the result yet.. so just use the last one?
+      try:
+        timestamp = int(key['sort'][0])
+      except KeyError:
+        timestamp = latest_tss
       time = timestamp_short(timestamp)
 
       # filebeat support
       if re.search('filebeat', cfg.myindex['name']):
         host = str(key['_source']['agent']['hostname'])
       else:
-        host = str(key['_source']['logsource'])
+
+        # logstash syslog
+        try:
+          host = str(key['_source']['logsource'])
+        except KeyError:
+          pass
+
+        # filebeat to logstash with no grok
+        try:
+          host = str(key['_source']['host'])
+        except KeyError:
+          pass
+
+        # prog
         try:
           prog = str(key['_source']['program'])
         except KeyError:
