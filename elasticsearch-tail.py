@@ -18,7 +18,7 @@ def signal_handler(signal, frame):
   sys.exit(0)
 
 # get the latest doc in the index
-def get_latest_event_timestamp(index):
+def get_latest_ts(index):
   res = es.search(size=1, index=index, sort="@timestamp:desc", body={"query": {"match_all": {}} })
 
   # At least one event should return, otherwise we have an issue.
@@ -35,8 +35,7 @@ def search_events(then,now):
   return res
 
 def timestamp_short(timestamp):
-  short = datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3]
-  return short
+  return(datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3])
 
 def print_c(color, string):
   if cfg.tail_colors['enabled'] == 'true':
@@ -52,10 +51,14 @@ def get_index():
   # search for index from config file and append matches to list
   for index in list:
     index_name = str(cfg.myindex['name'])
+
+    # match an exact index if supplied
     if re.match(('^' + index_name + '$'), index):
       indices = []
       indices.append(str(index))
       break
+
+    # search for index name in indexes
     if re.search(str(cfg.myindex['name']), index):
       indices.append(str(index))
 
@@ -65,8 +68,7 @@ def get_index():
     sys.exit(1)
 
   # sort the list of indexes and return the latest
-  indices = sorted(indices, reverse=True)
-  return indices[0]
+  return(sorted(indices, reverse=True)[0])
 
 # Ctrl+C handler
 signal.signal(signal.SIGINT, signal_handler)
@@ -86,8 +88,8 @@ http_auth=(cfg.elastic['user'],cfg.elastic['pass']))
 index = get_index()
 
 # Get the latest event timestamp from the Index
-latest_event_timestamp = get_latest_event_timestamp(index)
-print(print_c('red',index) + '- ' +  print_c('blue',timestamp_short(latest_event_timestamp)))
+latest_ts = get_latest_ts(index)
+print(print_c('red',index) + '- ' +  print_c('blue',timestamp_short(latest_ts)))
 
 # get current timestamp
 current_ts = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
@@ -99,13 +101,13 @@ while True:
   time2.sleep(cfg.tail['sleep'])
 
   # get latest ES timestamp
-  latest_event_timestamp = get_latest_event_timestamp(index)
+  latest_ts = get_latest_ts(index)
 
   # if latest ES timestamp is > now
-  if ( int(latest_event_timestamp) > current_ts):
+  if ( int(latest_ts) > current_ts):
 
     # query ES for events between current time and latest
-    results = search_events(current_ts, int(latest_event_timestamp))
+    results = search_events(current_ts, int(latest_ts))
 
     # map dict of results
     for key in results['hits']['hits']:
