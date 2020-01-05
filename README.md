@@ -2,7 +2,9 @@
 
 rework of the earlier work by juan-domenech - thanks!! :)
 
-only tested against opendistro for elasticsearch / with logstash syslog ingress
+only tested against: 
+  * opendistro 7.x / with logstash syslog ingress
+  * oss 6.x using eg filebeat to logstash type setups
 
 ### Security !!1
 
@@ -18,13 +20,17 @@ python 3
 
 copy the example-config.py to config.py and edit it 
 
-If you have no auth set the elastic the user and pass to blank
+set the user and pass to '' if you don't need auth
 
-set 'myindex' to eg logstash-foo
+set 'myindex' to eg logstash-foo and it will find the latest index based on that pattern
+
+set a specific pattern to match an index eg logstash-foo-2020-01-03
 
 the tail 'sleep' sets the number of seconds between es requests
 
-to disable colors set enabled to false
+'result_size' is how many docs we pull back 
+
+in the 'tail_color' section to disable colors set 'enabled' to false
 
 ### Usage
 
