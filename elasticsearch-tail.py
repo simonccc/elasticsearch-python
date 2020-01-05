@@ -51,6 +51,11 @@ def get_index():
 
   # search for index from config file and append matches to list
   for index in list:
+    index_name = str(cfg.myindex['name'])
+    if re.match(('^' + index_name + '$'), index):
+      indices = []
+      indices.append(str(index))
+      break
     if re.search(str(cfg.myindex['name']), index):
       indices.append(str(index))
 
@@ -112,16 +117,14 @@ while True:
       time = timestamp_short(timestamp)
 
       # default prog used for logstash
-      prog = 'NONE'
+      prog = '_'
 
       # filebeat support
       if re.search('filebeat', cfg.myindex['name']):
         host = str(key['_source']['agent']['hostname'])
       else:
         host = str(key['_source']['logsource'])
-
-        # prog
-        if (key['_source']['program']) is not None:
+        if key['_source']['program']:
           prog = str(key['_source']['program'])
 
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
