@@ -119,7 +119,7 @@ while True:
       try:
         timestamp = int(key['sort'][0])
       except KeyError:
-        timestamp = latest_tss
+        timestamp = latest_ts
       time = timestamp_short(timestamp)
 
       # filebeat support
