@@ -1,27 +1,31 @@
 ## `elasticsearch-tail.py`
 
-implementation of a tail like thing for elasticsearch 7.x
+rework of the earlier work by juan-domenech - thanks!! :)
 
-simplification of the earlier work by juan-domenech - thanks!! :) 
+only tested against opendistro for elasticsearch / with logstash syslog ingress
 
-tested against the open distro for elasticsearch 1.3.x
+### Security !!1
 
-### Security
-
-all of the TLS verification checks have been removed - have a look at the code; they should be easy to re-enable
+all of the TLS verification checks have been removed
 
 ### Setup
 
-python 3 required
+python 3
 
-pip3 install -r requirements.txt
+`pip3 install -r requirements.txt`
+
+### Config
+
+copy the example-config.py to config.py and edit it 
+
+If you have no auth set the elastic the user and pass to blank
+
+set 'myindex' to eg logstash-foo
+
+the tail 'sleep' sets the number of seconds between es requests
+
+to disable colors set enabled to false
 
 ### Usage
 
-create a config.py based on the example provided
-
-logstash and filebeat are the only index patterns tested so far! ymmv
-you do not need to include a trailing '-' on the index
-
-then run ./elasticsearch-tail.py
-
+run ./elasticsearch-tail.py
