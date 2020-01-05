@@ -87,10 +87,10 @@ index = get_index()
 
 # Get the latest event timestamp from the Index
 latest_event_timestamp = get_latest_event_timestamp(index)
-print(print_c('red',index) + ' at ' +  print_c('blue',timestamp_short(latest_event_timestamp)))
+print(print_c('red',index) + '- ' +  print_c('blue',timestamp_short(latest_event_timestamp)))
 
 # get current timestamp
-current_time = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
+current_ts = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
 
 # Main
 while True:
@@ -102,10 +102,10 @@ while True:
   latest_event_timestamp = get_latest_event_timestamp(index)
 
   # if latest ES timestamp is > now
-  if ( int(latest_event_timestamp) > int(current_time)):
+  if ( int(latest_event_timestamp) > current_ts):
 
     # query ES for events between current time and latest
-    results = search_events(int(current_time), int(latest_event_timestamp))
+    results = search_events(current_ts, int(latest_event_timestamp))
 
     # map dict of results
     for key in results['hits']['hits']:
@@ -116,17 +116,16 @@ while True:
       timestamp = int(key['sort'][0])
       time = timestamp_short(timestamp)
 
-      # default prog used for logstash
-      prog = '_'
-
       # filebeat support
       if re.search('filebeat', cfg.myindex['name']):
         host = str(key['_source']['agent']['hostname'])
       else:
         host = str(key['_source']['logsource'])
-        if key['_source']['program']:
+        try:
           prog = str(key['_source']['program'])
+        except KeyError:
+          prog = "_"
 
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
     # end of the results so set "current" timestamp to the last result
-    current_time = timestamp
+    current_ts = timestamp
