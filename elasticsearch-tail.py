@@ -115,12 +115,8 @@ while True:
 
       # timestamp from the last message in the result set is used for the next query
       # time is the shorter format used in output
-      # sometimes its not in the result yet.. so just use the last one?
-      try:
-        timestamp = int(key['sort'][0])
-      except KeyError:
-        timestamp = latest_ts
-      time = timestamp_short(timestamp)
+      latest_ts = int(key['sort'][0])
+      time = timestamp_short(latest_ts)
 
       # filebeat support
       if re.search('filebeat', cfg.myindex['name']):
@@ -149,4 +145,4 @@ while True:
       time2.sleep(cfg.tail['buffer'])
 
     # end of the results so set "current" timestamp to the last result
-    current_ts = timestamp
+    current_ts = latest_ts
