@@ -23,7 +23,7 @@ def get_latest_ts(index):
 
   # At least one event should return, otherwise we have an issue.
   if len(res['hits']['hits']) != 0:
-    timestamp = res['hits']['hits'][0]['sort'][0]
+    timestamp = int(res['hits']['hits'][0]['sort'][0])
     return timestamp
   else:
     print("ERROR: No results found in index="+index)
@@ -104,10 +104,10 @@ while True:
   latest_ts = get_latest_ts(index)
 
   # if latest ES timestamp is > now
-  if ( int(latest_ts) > current_ts):
+  if ( latest_ts > current_ts):
 
     # query ES for events between current time and latest
-    results = search_events(current_ts, int(latest_ts))
+    results = search_events(current_ts,latest_ts)
 
     # map dict of results
     for key in results['hits']['hits']:
@@ -146,5 +146,7 @@ while True:
           prog = "_"
 
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
+      time2.sleep(cfg.tail['buffer'])
+
     # end of the results so set "current" timestamp to the last result
     current_ts = timestamp

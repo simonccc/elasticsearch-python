@@ -1,11 +1,10 @@
 elastic = {'es_host': 'https://localhost:9200',
 	 'user': 'admin',
 	 'pass': 'admin'}
-#logstash and filebeat tested
 myindex = {'name': 'logstash'}
-#  how long to sleep between requests in seconds
 tail = {
         'sleep': 0.5
+        'buffer': 0.1,
         'result_size': 1000
 }
 tail_colors = {
