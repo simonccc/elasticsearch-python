@@ -3,7 +3,7 @@
 rework of the earlier work by juan-domenech - thanks!! :)
 
 only tested against: 
-  * opendistro 7.x / with logstash syslog ingress
+  * opendistro 7.x-oss / with logstash syslog ingress
   * oss 6.x using eg filebeat to logstash type setups
 
 ### Security !!1
@@ -26,9 +26,13 @@ set 'myindex' to eg logstash-foo and it will find the latest index based on that
 
 set a specific pattern to match an index eg logstash-foo-2020-01-03
 
-the tail 'sleep' sets the number of seconds between es requests
+'sleep' sets the number of seconds between es requests
 
-'result_size' is how many docs we pull back 
+'buffer' is the delay between printing each line
+
+'result_size' is how many docs we pull back per request
+
+you may need to tweak these depending on how many docs you're expecting / how loaded ES is
 
 in the 'tail_color' section to disable colors set 'enabled' to false
 
