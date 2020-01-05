@@ -130,10 +130,11 @@ while True:
           pass
 
         # filebeat to logstash with no grok
-        try:
-          host = str(key['_source']['host'])
-        except KeyError:
-          pass
+        if not host:
+          try:
+            host = str(key['_source']['host'])
+          except KeyError:
+            pass
 
         # prog
         try:
