@@ -50,7 +50,11 @@ def get_index():
 
   # search for index from config file and append matches to list
   for index in list:
-    index_name = str(cfg.myindex['name'])
+    try:
+      if sys.argv[1]:
+        index_name = sys.argv[1]
+    except:
+      index_name = str(cfg.myindex['name'])
 
     # match an exact index if supplied
     if re.match(('^' + index_name + '$'), index):
@@ -59,12 +63,12 @@ def get_index():
       break
 
     # search for index name in indexes
-    if re.search(str(cfg.myindex['name']), index):
+    if re.search(str(index_name), index):
       indices.append(str(index))
 
   # no match found for supplied index
   if indices == []:
-    print('no index found: ' + str(cfg.myindex['name']))
+    print('no index found: ' + str(index_name))
     sys.exit(1)
 
   # sort the list of indexes and return the latest
@@ -111,7 +115,18 @@ while True:
 
     # map dict of results
     for key in results['hits']['hits']:
-      message = key['_source']['message']
+
+      # logstash and filebeat
+      try:
+        message = key['_source']['message']
+      except KeyError:
+        try:
+          message = key['_source']['log']
+          message = message.strip('\n')
+        except KeyError:
+          pass
+
+      
 
       # timestamp from the last message in the result set is used for the next query
       # time is the shorter format used in output
@@ -127,14 +142,10 @@ while True:
         try:
           host = str(key['_source']['logsource'])
         except KeyError:
-          pass
-
-        # filebeat to logstash with no grok
-        if not host:
           try:
             host = str(key['_source']['host'])
           except KeyError:
-            pass
+            host = "*"
 
         # prog
         try:
