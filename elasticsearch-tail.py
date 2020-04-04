@@ -96,7 +96,7 @@ latest_ts = get_latest_ts(index)
 print(print_c('red',index) + '- ' +  print_c('blue',timestamp_short(latest_ts)))
 
 # get current timestamp
-current_ts = int(datetime.datetime.utcnow().strftime('%s%f')[:-3])
+current_ts = int(datetime.datetime.now().strftime('%s%f')[:-3])
 
 # Main
 while True:
@@ -125,8 +125,6 @@ while True:
           message = message.strip('\n')
         except KeyError:
           pass
-
-      
 
       # timestamp from the last message in the result set is used for the next query
       # time is the shorter format used in output
