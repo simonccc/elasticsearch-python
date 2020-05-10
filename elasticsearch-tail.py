@@ -132,8 +132,9 @@ while True:
       time = timestamp_short(latest_ts)
 
       # filebeat support
-      if re.search('filebeat', cfg.myindex['name']):
+      if re.search('filebeat',index):
         host = str(key['_source']['agent']['hostname'])
+        prog = 'filebeat'
       else:
 
         # logstash syslog
