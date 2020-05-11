@@ -3,9 +3,9 @@ elastic = {'es_host': 'https://localhost:9200',
 	 'pass': 'admin'}
 myindex = {'name': 'logstash'}
 tail = {
-        'sleep': 0.5
-        'buffer': 0.1,
-        'result_size': 1000
+        'sleep': '0.5',
+        'buffer': '0.1',
+        'result_size': '1000',
 }
 tail_colors = {
         'enabled': 'true',
