@@ -102,7 +102,7 @@ current_ts = int(datetime.datetime.now().strftime('%s%f')[:-3])
 while True:
 
   # wait for logs..
-  time2.sleep(cfg.tail['sleep'])
+  time2.sleep(float(cfg.tail['sleep']))
 
   # get latest ES timestamp
   latest_ts = get_latest_ts(index)
@@ -153,7 +153,7 @@ while True:
           prog = "_"
 
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
-      time2.sleep(cfg.tail['buffer'])
+      time2.sleep(float(cfg.tail['buffer']))
 
     # end of the results so set "current" timestamp to the last result
     current_ts = latest_ts
