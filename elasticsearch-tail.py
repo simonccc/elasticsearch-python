@@ -9,6 +9,8 @@ warnings.filterwarnings("ignore")
 import time as time2
 import re
 import signal
+from retry import retry
+# elasticsearch
 from elasticsearch import Elasticsearch
 # local config
 import config as cfg
@@ -154,6 +156,7 @@ while True:
 
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
       time2.sleep(float(cfg.tail['buffer']))
+      retry(delay=1)
 
     # end of the results so set "current" timestamp to the last result
     current_ts = latest_ts
