@@ -1,44 +1,57 @@
 #!/usr/bin/env python3
-import datetime
-import sys
-import ssl
-from elasticsearch.connection import create_ssl_context
-# disables SSL warnings
-import warnings
-warnings.filterwarnings("ignore")
-import time as time2
-import re
-import signal
+import datetime, sys, ssl, re, signal, requests, socket
+
 from retry import retry
+requests.packages.urllib3.disable_warnings()
+sys.tracebacklimit = 0
+
+import time as time2
+
 # elasticsearch
 from elasticsearch import Elasticsearch
+from elasticsearch.connection import create_ssl_context
+
 # local config
 import config as cfg
+es_host = cfg.elastic['es_host']
+host = es_host.split(':')[1].replace("//", "")
+
+# check dns exists
+try:
+  if socket.gethostbyname(host): pass
+except:
+  print('ERROR: no dns for:', host)
+  sys.exit(1)
 
 # ctrlc
-def signal_handler(signal, frame):
+def sig_h(signal, frame):
   sys.exit(0)
+signal.signal(signal.SIGINT, sig_h)
 
 # get the latest doc in the index
 def get_latest_ts(index):
+
   res = es.search(size=1, index=index, sort="@timestamp:desc", body={"query": {"match_all": {}} })
 
-  # At least one event should return, otherwise we have an issue.
+  # At least one event should return
   if len(res['hits']['hits']) != 0:
-    timestamp = int(res['hits']['hits'][0]['sort'][0])
-    return timestamp
+    ts = int(res['hits']['hits'][0]['sort'][0])
+    return ts
   else:
     print("ERROR: No results found in index="+index)
     sys.exit(1)
 
+# search events between then and now
 def search_events(then,now):
   query = {'query': {'bool': {'must': {'range': {'@timestamp': {'gt': then, 'lte': now }}}}}}
   res = es.search(size=cfg.tail['result_size'], index=index, sort="@timestamp:asc", body=query)
   return res
 
-def timestamp_short(timestamp):
+# return shortimestamp used in output
+def ts_short(timestamp):
   return(datetime.datetime.fromtimestamp(int(timestamp) / 1000).strftime('%H:%M:%S.%f')[:-3])
 
+# print output
 def print_c(color, string):
   if cfg.tail_colors['enabled'] == 'true':
    return(cfg.tail_colors[color] + string  + '\x1b[0m ')
@@ -47,12 +60,14 @@ def print_c(color, string):
 
 # get the index to be tailed
 def get_index():
+
   indices = []
   list = es.indices.get_alias("*")
 
   # search for index from config file and append matches to list
   for index in list:
     try:
+      # support an index name passed as an arg
       if sys.argv[1]:
         index_name = sys.argv[1]
     except:
@@ -73,29 +88,31 @@ def get_index():
     print('no index found: ' + str(index_name))
     sys.exit(1)
 
-  # sort the list of indexes and return the latest
+  # sort the list of indexes and return the latest one eg in the case of daily or monthly indexes
   return(sorted(indices, reverse=True)[0])
-
-# Ctrl+C handler
-signal.signal(signal.SIGINT, signal_handler)
 
 # connect to es with no SSL security checks
 # disable these if you don't need them!
 ssl_context = create_ssl_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
-es = Elasticsearch(
-cfg.elastic['es_host'],
-verify_certs=False,
-ssl_context=ssl_context,
-http_auth=(cfg.elastic['user'],cfg.elastic['pass']))
+
+try:
+  es = Elasticsearch(
+  es_host,
+#  verify_certs=False,
+  ssl_context=ssl_context,
+  http_auth=(cfg.elastic['user'],cfg.elastic['pass']))
+except Exception as ex:
+  print("Error:", ex)
+  sys.exit(1)
 
 # get index
 index = get_index()
 
 # Get the latest event timestamp from the Index
 latest_ts = get_latest_ts(index)
-print(print_c('red',index) + '- ' +  print_c('blue',timestamp_short(latest_ts)))
+print(print_c('red',index) + '- ' +  print_c('blue',ts_short(latest_ts)))
 
 # get current timestamp
 current_ts = int(datetime.datetime.now().strftime('%s%f')[:-3])
@@ -131,7 +148,7 @@ while True:
       # timestamp from the last message in the result set is used for the next query
       # time is the shorter format used in output
       latest_ts = int(key['sort'][0])
-      time = timestamp_short(latest_ts)
+      time = ts_short(latest_ts)
 
       # filebeat support
       if re.search('filebeat',index):
