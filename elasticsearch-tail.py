@@ -61,17 +61,18 @@ def print_c(color, string):
 # get the index to be tailed
 def get_index():
 
+  # index name passed as an arg
+  try:
+    if sys.argv[1]:
+      index_name = sys.argv[1]
+  except:
+    index_name = str(cfg.myindex['name'])
+
   indices = []
-  list = es.indices.get_alias("*")
+  list = es.indices.get(index_name + '*')
 
   # search for index from config file and append matches to list
   for index in list:
-    try:
-      # support an index name passed as an arg
-      if sys.argv[1]:
-        index_name = sys.argv[1]
-    except:
-      index_name = str(cfg.myindex['name'])
 
     # match an exact index if supplied
     if re.match(('^' + index_name + '$'), index):
