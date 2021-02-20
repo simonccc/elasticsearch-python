@@ -22,19 +22,17 @@ copy the example-config.py to config.py and edit it
 
 set the user and pass to '' if you don't need auth
 
-set 'myindex' to eg logstash-foo and it will find the latest index based on that pattern
+* `myindex` set this to eg logstash-foo and it will find the latest index based on that pattern 
 
-set a specific pattern to match an index eg logstash-foo-2020-01-03
+* `sleep` sets the number of seconds between es requests
 
-'sleep' sets the number of seconds between es requests
+* `buffer` is the delay between printing each line
 
-'buffer' is the delay between printing each line
-
-'result_size' is how many docs we pull back per request
+* `result_size` is how many docs we pull back per request
 
 you may need to tweak these depending on how many docs you're expecting / how loaded ES is
 
-in the 'tail_color' section to disable colors set 'enabled' to false
+* `tail_color` section to disable colors set 'enabled' to false
 
 ### Usage
 
