@@ -142,7 +142,6 @@ while True:
       except KeyError:
         try:
           message = key['_source']['log']
-          message = message.strip('\n')
         except KeyError:
           pass
 
@@ -172,6 +171,7 @@ while True:
         except KeyError:
           prog = "_"
 
+      message = message.strip('\n')
       print(print_c('blue',time) + print_c('yellow', host) + print_c('green', prog) + message)
       time2.sleep(float(cfg.tail['buffer']))
       retry(delay=1)
