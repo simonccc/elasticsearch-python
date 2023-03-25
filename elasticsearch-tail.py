@@ -8,8 +8,8 @@ sys.tracebacklimit = 0
 import time as time2
 
 # elasticsearch
-from elasticsearch import Elasticsearch
-from elasticsearch.connection import create_ssl_context
+from opensearchpy import OpenSearch
+from opensearchpy.connection import create_ssl_context
 
 # local config
 import config as cfg
@@ -99,7 +99,7 @@ ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
 try:
-  es = Elasticsearch(
+  es = OpenSearch(
   es_host,
 #  verify_certs=False,
   ssl_context=ssl_context,

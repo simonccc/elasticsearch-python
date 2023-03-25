@@ -3,8 +3,9 @@
 rework of the earlier work by juan-domenech - thanks!! :)
 
 only tested against: 
-  * opendistro 7.x-oss / with logstash syslog ingress
-  * oss 6.x using eg filebeat to logstash type setups
+  * opensearch 2.6.x
+
+( see the elasticsearch branch for older ES support ) 
 
 ### Security !!1
 
